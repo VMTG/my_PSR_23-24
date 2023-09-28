@@ -43,30 +43,6 @@ for key in keys:
 
 print ('Numerical keys' + str(numerical_keys))
 
-#ex5c
-
-d_keys = {}
-i = 0
-for key_idx, key in enumerate(keys):
-    d_keys[key_idx] = key
-
-print('d_keys = ' + str(d_keys))
-
-#ex5d
-
-numerical_keys.sort()
-print('NUmerical keys' + str(numerical_keys))
-
-#ex5e
-
-numerical_keys2 = [x for x in keys if x.isnumeric()]
-
-d_keys2 = {idx:x for idx,x in enumerate(keys)}
-
-print('Numerical keys2' + str(numerical_keys2))
-print('d_keys2' + str(numerical_keys2))
-
-
 def main():
 
     countNumbersUpTo('x')
