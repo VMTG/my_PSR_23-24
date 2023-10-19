@@ -1,119 +1,227 @@
 #!/usr/bin/env python3
 #shebang line to inform the OS that the content is in python
 
-import argparse
-import random
-import time
-import curses
-from collections import namedtuple
-from pprint import pprint
+#!/usr/bin/env python3
 
-#     Para um teste de tempo máximo de 60 segundos: ./main.py -utm -mv 60
-#     Para um teste de número máximo de inputs (por exemplo, 50): ./main.py -mv 50
-#     Para usar palavras em vez de caracteres únicos: ./main.py -utm -mv 60 -uw
+#Import section
+import random   #Generate random values
+import readchar #Read keys
 
-Input = namedtuple('Input', ['requested', 'received', 'duration'])
+from time import time, ctime            #Time related functions
+from colorama import Fore, Back, Style  #Color for the style
+from readchar import readkey, key       #Read keys
+from collections import namedtuple      #Use namedtuples
+from pprint import pprint               #Pretty-print
 
-def generate_random_letter():
-    return random.choice('abcdefghijklmnopqrstuvwxyz')
+Input = namedtuple('Input', ['requested', 'received', 'duration']) #tupple to store the variables
 
-def generate_random_word():
-    words = ['apple', 'banana', 'orange', 'grape', 'python', 'programming', 'challenge', 'keyboard']
-    return random.choice(words)
+#main program function
+def runProgram(timeMode, maxValue, useWords, english):
 
-def main(stdscr, args):
-    stdscr.clear()
-    stdscr.addstr("Pressione qualquer tecla para começar o desafio...")
-    stdscr.getch()
+    #Get a list of words
+    if english:
+        wordFile = "wordlist.txt"
+    else:
+        wordFile = "palavras.txt"
+    
+    WORDS = open(wordFile).read().splitlines()
 
-    test_start = time.strftime('%c')
+    #main vars for stats and for stoping reseted
+    startTime = time()          #Start Time
+    startDate = ctime()         #Start Date
+    spacePressed = False        #Ensuring that this ending var starts false
+    numberInputs = 0            #Reset number of inputs
+    numberHits = 0              #Reset number of hits
+    numberMiss = 0              #Reset number of miss
+    inputDuration = []          #Empty lists to append values later
+    hitDuration = []
+    missDuration = []
+    inputData = []
 
-    inputs = []
-    number_of_types = 0
-    number_of_hits = 0
-    start_time = time.time()
+    #Check if its time mode or words mode
+    if timeMode:
+        conditionEnd = 'Time'
+    else:
+        conditionEnd = 'Words'
+    
+    #Main logic of the program
+    if useWords:
+        while True: #Mode of words
+            inputStartTime = time()                 #Getting the time the input started
 
-    while True:
-        stdscr.clear()
-        if args.use_words:
-            requested_word = generate_random_word()
-        else:
-            requested_word = generate_random_letter()
+            while True: #Note: this cicle was made because some of the english words were too small. For the pr version, it wasn't needed
+                randomWord = random.choice(WORDS)   #Generate the word
+                size = len(randomWord)              #Get the lenght of the word
+                if size >= 4:
+                    printBox(randomWord)            #Show the word
+                    break
+            
+            #Cicle to wait for the whole word be typed
+            isWrong = False
+            keys = ''
+            for i in range(0,size):
+                k = readkey()
+                keys += k
+                print(k,end='',flush=True)
 
-        stdscr.addstr(f"Digite: {requested_word}")
-        stdscr.refresh()
+                if k != randomWord[i]:          #this verifies if there is any lether wrong
+                    isWrong = True
 
-        start_input_time = time.time()
-        received_word = stdscr.getkey()
-        end_input_time = time.time()
-        input_duration = end_input_time - start_input_time
+                if k == " ":                    #Spacebar has to interrupt the for cicle before the while cicle
+                    spacePressed = True
+                    break
+            
+            #Increase in the completition vars
+            nowTime = time()
+            numberInputs += 1
 
-        input_data = Input(requested_word, received_word, input_duration)
-        inputs.append(input_data)
+            inputDuration.append(nowTime - inputStartTime)
 
-        number_of_types += 1
-        if requested_word == received_word:
-            number_of_hits += 1
+            print() #Just a visual cleaning element
+            
+            #Verifying process
+            if isWrong:
+                print(Fore.RED+Style.BRIGHT+'Wrong - You wrote: ' + str(keys)+Style.RESET_ALL)
+                numberMiss += 1
+                missDuration.append(inputDuration[-1])
+            else:
+                print(Fore.GREEN+Style.BRIGHT+'Correct - You wrote: ' + str(keys)+Style.RESET_ALL)
+                numberHits += 1
+                hitDuration.append(inputDuration[-1])
 
-        if received_word == ' ':
-            break
+            #Storing the data in tupple form
+            inputData.append(Input(randomWord, keys, f"{inputDuration[-1]:.2f}"))
 
-        if args.use_time_mode:
-            if time.time() - start_time > args.max_value:
+            #Verify if the completition conditions were satisfied
+            if conditionEnd == 'Time':
+                progress = (nowTime - startTime) / maxValue
+
+                if nowTime - startTime >= maxValue:                             #Ending in time limit
+                    break
+
+            elif conditionEnd == 'Words':
+                progress = numberInputs / maxValue
+                
+                if numberInputs >= maxValue:                                    #Ending in number of words
+                    break
+
+            elif spacePressed:                                                  #Ending with spacebar
                 break
-        else:
-            if number_of_types >= args.max_value:
+
+            progressBar(progress)
+            print()
+    else:
+        while True: #Mode of chars
+
+            inputStartTime = time()             #Getting the time of the input started
+
+            randomChar = random.choice('abcdefghijklmnopqrstuvwxyz')    #Generate the char
+            printBox(randomChar)                                        #Show the char
+            k = readkey()                                               #Wait for the typing
+            print()                                                     #Just a visual element
+
+
+            #Increment stats and stopping vars            
+            nowTime = time()
+            numberInputs += 1
+            
+            inputDuration.append(nowTime - inputStartTime)
+
+            #Verification process
+            if k == randomChar:                         #Its Correct
+                print(Fore.GREEN+Style.BRIGHT+'Correct - Pressed: ' + str(k)+Style.RESET_ALL)
+                numberHits += 1
+                hitDuration.append(inputDuration[-1])
+            else:                                       #Its Wrong
+                print(Fore.RED+Style.BRIGHT+'Wrong - Pressed: ' + str(k)+Style.RESET_ALL)
+                numberMiss += 1
+                missDuration.append(inputDuration[-1])
+
+            #Storing the data in tupple form
+            inputData.append(Input(randomChar, k, f"{inputDuration[-1]:.2f}"))
+
+            #Verify if the completition conditions were satisfied
+            if conditionEnd == 'Time':
+                progress = (nowTime - startTime) / maxValue                
+                
+                if nowTime - startTime >= maxValue:                             #Ending with time
+                    break
+
+            elif conditionEnd == 'Words':
+                progress = numberInputs / maxValue               
+                
+                if numberInputs >= maxValue:                                    #Ending with number of words
+                    break
+            
+            elif k == " ":                                                      #Ending with spacebar
                 break
 
-    test_end = time.strftime('%c')
-    test_duration = time.time() - start_time
+            progressBar(progress)
+            print()
 
-    accuracy = number_of_hits / number_of_types if number_of_types > 0 else 0
-    type_average_duration = test_duration / number_of_types if number_of_types > 0 else 0
-    type_hit_average_duration = sum([input_data.duration for input_data in inputs if input_data.requested == input_data.received and input_data.duration > 0]) / number_of_hits if number_of_hits > 0 else 0
-    type_miss_average_duration = sum([input_data.duration for input_data in inputs if input_data.requested != input_data.received and input_data.duration > 0]) / (number_of_types - number_of_hits) if (number_of_types - number_of_hits) > 0 else 0
+    
+    #Avoiding diving for zero
+    if numberInputs == 0:
+        numberInputs = 1
+    if numberHits == 0:
+        numberHits = 1
+    if numberMiss == 0:
+        numberMiss = 1
 
+    #Saving the end time of the test and calculating duration
+    endTime = time()                                            #Time of ending
+    endDate = ctime()                                           #Date of ending
+    testDuration = endTime - startTime                          #Duration of the test
+    accuracy = numberHits / numberInputs * 100                  #Accuracy of the test
+    typeAverageDuration = sum(inputDuration) / numberInputs     #Average duration
+    hitAverageDuration = sum(hitDuration) / numberHits          #Average duration of the hits
+    missAverageDuration = sum(missDuration) / numberMiss        #Average duration of the miss
 
-    result_dict = {
-        'test_start': test_start,
-        'test_end': test_end,
-        'test_duration': test_duration,
-        'number_of_types': number_of_types,
-        'number_of_hits': number_of_hits,
-        'accuracy': accuracy,
-        'type_average_duration': type_average_duration,
-        'type_hit_average_duration': type_hit_average_duration,
-        'type_miss_average_duration': type_miss_average_duration,
-        'inputs': inputs
+    #Formating the main vars to declutter the final visual
+    fAccuracy = str(f"{accuracy:.1f}")+'%'
+    fHitDuration = f"{hitAverageDuration:.2f}"
+    fMissDuration = f"{missAverageDuration:.2f}"
+    fTestDuration = f"{testDuration:.2f}"
+    fTypeDuration = f"{typeAverageDuration:.2f}"
+
+    #Dictionary with all the stats vars
+    result = {
+        "Inputs": inputData,
+        "Test Start": startDate,
+        "Test End": endDate,
+        "Test Duration": fTestDuration,
+        "Number of Types": numberInputs,
+        "Number of Hits": numberHits,
+        "Number of Miss": numberMiss,
+        "Accuracy": fAccuracy,
+        "Type Average Duration": fTypeDuration,
+        "Hit Average Duration": fHitDuration,
+        "Miss Average Duration": fMissDuration
     }
 
-    stdscr.clear()
-    stdscr.addstr("Teste Concluído!\n\n")
-    #stdscr.refresh()
-    #time.sleep(1)
+    #Printing the end of the programm
+    print()
+    pprint(result)
+    return
 
-    pprint(result_dict)
+#Function that creates a visual box to include the word/character
+def printBox(text):
+    textLength = len(text)
+    border = "+" + "-" * (textLength + 2) + "+"
+    emptyLine = "|" + " " * (textLength + 2) + "|"
+    
+    print(border)
+    print(emptyLine)
+    print(f"| {text} |")
+    print(emptyLine)
+    print(border)
+    print()
 
-    # Imprimindo a lista final com todos os parâmetros e valores
-    final_list = [f"{key}: {value}" for key, value in result_dict.items()]
-    stdscr.addstr("\nLista Final:\n")
-    stdscr.addstr("\n".join(final_list))
-    stdscr.refresh()
-
-    stdscr.getch()  # Espera que o usuário pressione uma tecla antes de sair
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Definition of test mode')
-    parser.add_argument('-utm', '--use_time_mode', action='store_true', help='Max number of secs for time mode')
-    parser.add_argument('-mv', '--max_value', type=int, help='Max number of seconds for time mode or maximum number of inputs for number of inputs mode.')
-    parser.add_argument('-uw', '--use_words', action='store_true', help='Use word typing mode, instead of single character typing.')
-    args = parser.parse_args()
-
-    curses.wrapper(main, args)
-
-
-
-
-
-
-
+#Function to create a progress bar and update it
+def progressBar(progress):
+    barLength = 40
+    completedLength = int(barLength * progress)     #How much of the bar is completed
+    remainingLength = barLength - completedLength   #How much is remaining
+    completedPart = Fore.GREEN + '-' * completedLength
+    remainingPart = Fore.RESET + ' ' * remainingLength
+    print(Style.BRIGHT+'|'+completedPart + remainingPart+'| -> Progress: '+str(int(progress*100))+'%'+Style.RESET_ALL)
